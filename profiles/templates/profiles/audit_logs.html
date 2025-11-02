@@ -1,0 +1,200 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <title>Audit Logs</title>
+    <style>
+      .severity-info { border-left: 4px solid #0dcaf0; }
+      .severity-warning { border-left: 4px solid #ffc107; }
+      .severity-error { border-left: 4px solid #dc3545; }
+      .severity-critical { border-left: 4px solid #8b0000; }
+    </style>
+  </head>
+  <body class="bg-light">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid d-flex justify-content-between">
+        <div>
+          <a class="navbar-brand" href="/dashboard/">Credit Profiles</a>
+          <a class="btn btn-outline-light btn-sm ms-2" href="/dashboard/">Dashboard</a>
+          <a class="btn btn-outline-light btn-sm ms-2" href="/customers/">Customers</a>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <a class="btn btn-sm btn-outline-light" href="/profile/">{{ user.username }}</a>
+          <form method="post" action="/accounts/logout/" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="/accounts/login/" />
+            <button class="btn btn-sm btn-warning" type="submit">Logout</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container-fluid py-4">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0"><i class="bi bi-clipboard-check"></i> Audit Logs & Activity Trail</h1>
+        <a href="/dashboard/" class="btn btn-outline-secondary">← Back</a>
+      </div>
+
+      <!-- Statistics Cards -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted small">Total Logs</div>
+              <div class="fs-3 fw-bold">{{ total_logs }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted small">Errors & Critical</div>
+              <div class="fs-3 fw-bold text-danger">{{ error_count }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card">
+            <div class="card-body">
+              <div class="text-muted small">Today's Activities</div>
+              <div class="fs-3 fw-bold text-primary">{{ today_count }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <form method="get" class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Customer</label>
+              <select name="customer" class="form-select">
+                <option value="">All Customers</option>
+                {% for c in customers %}
+                <option value="{{ c.id }}" {% if filters.customer == c.id|stringformat:"s" %}selected{% endif %}>{{ c.full_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Action</label>
+              <select name="action" class="form-select">
+                <option value="">All Actions</option>
+                {% for value, label in action_choices %}
+                <option value="{{ value }}" {% if filters.action == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Severity</label>
+              <select name="severity" class="form-select">
+                <option value="">All</option>
+                {% for value, label in severity_choices %}
+                <option value="{{ value }}" {% if filters.severity == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">From Date</label>
+              <input type="date" name="date_from" class="form-control" value="{{ filters.date_from }}" />
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">To Date</label>
+              <input type="date" name="date_to" class="form-control" value="{{ filters.date_to }}" />
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">&nbsp;</label>
+              <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+          </form>
+          <form method="get" class="mt-2">
+            <div class="row">
+              <div class="col-md-4">
+                <input type="text" name="search" class="form-control" placeholder="Search description, name, email..." value="{{ filters.search }}" />
+                {% for key, value in filters.items %}
+                  {% if key != 'search' and value %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}" />
+                  {% endif %}
+                {% endfor %}
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-outline-primary">Search</button>
+                <a href="/audit-logs/" class="btn btn-outline-secondary">Clear</a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Logs Table -->
+      <div class="card">
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead>
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Action</th>
+                  <th>Customer</th>
+                  <th>Severity</th>
+                  <th>Description</th>
+                  <th>IP Address</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for log in logs %}
+                <tr class="severity-{{ log.severity }}">
+                  <td>{{ log.created_at|date:"Y-m-d H:i:s" }}</td>
+                  <td><span class="badge bg-secondary">{{ log.get_action_display }}</span></td>
+                  <td>
+                    {% if log.customer %}
+                      <a href="/customers/{{ log.customer.id }}/">{{ log.customer.full_name }}</a>
+                    {% else %}
+                      <span class="text-muted">System</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge 
+                      {% if log.severity == 'info' %}bg-info
+                      {% elif log.severity == 'warning' %}bg-warning text-dark
+                      {% elif log.severity == 'error' %}bg-danger
+                      {% else %}bg-dark
+                      {% endif %}">
+                      {{ log.get_severity_display }}
+                    </span>
+                  </td>
+                  <td>{{ log.description }}</td>
+                  <td>{{ log.ip_address|default:"-" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                  <td colspan="6" class="text-center text-muted py-4">No logs found</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          {% if logs.has_other_pages %}
+          <nav aria-label="Page navigation" class="mt-3">
+            <ul class="pagination justify-content-center">
+              {% if logs.has_previous %}
+              <li class="page-item"><a class="page-link" href="?page={{ logs.previous_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Previous</a></li>
+              {% endif %}
+              <li class="page-item disabled"><span class="page-link">Page {{ logs.number }} of {{ logs.paginator.num_pages }}</span></li>
+              {% if logs.has_next %}
+              <li class="page-item"><a class="page-link" href="?page={{ logs.next_page_number }}{% for key, value in filters.items %}{% if value %}&{{ key }}={{ value }}{% endif %}{% endfor %}">Next</a></li>
+              {% endif %}
+            </ul>
+          </nav>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+

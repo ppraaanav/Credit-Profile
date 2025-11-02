@@ -1,0 +1,8 @@
+django>=5.2,<6.0
+djangorestframework>=3.16,<3.17
+django-filter>=24.3
+xhtml2pdf>=0.2.15
+django-allauth>=65.0.0
+PyJWT>=2.9.0
+python-dotenv>=1.0.1
+
