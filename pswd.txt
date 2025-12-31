@@ -1,0 +1,2 @@
+user: pranav123, pswd: abcd@123
+admin: admin@gmail.com, pswd: admin
